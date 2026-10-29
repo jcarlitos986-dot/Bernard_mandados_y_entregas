@@ -4,14 +4,23 @@ import os
 
 st.set_page_config(page_title="Sistema de Reparto Pro", layout="wide")
 DATA_FILE = "pedidos_reparto.csv"
+COLUMNAS = ["ID", "Cliente", "Servicio", "Dirección", "Estado"]
+SERVICIOS = ["Moto taxi", "Servicio de paquetería", "Mandados"]
+
+def normalizar(df):
+    """Asegura que el DataFrame tenga todas las columnas (compatible con CSV antiguos)."""
+    if "Servicio" not in df.columns:
+        df["Servicio"] = "Sin especificar"
+    df["Servicio"] = df["Servicio"].fillna("Sin especificar")
+    return df[COLUMNAS]
 
 def cargar_datos():
     if os.path.exists(DATA_FILE):
         try:
-            return pd.read_csv(DATA_FILE)
+            return normalizar(pd.read_csv(DATA_FILE))
         except Exception:
-            return pd.DataFrame(columns=["ID", "Cliente", "Dirección", "Estado"])
-    return pd.DataFrame(columns=["ID", "Cliente", "Dirección", "Estado"])
+            return pd.DataFrame(columns=COLUMNAS)
+    return pd.DataFrame(columns=COLUMNAS)
 
 # Cargar datos en el estado de la sesión
 if "df" not in st.session_state:
@@ -24,6 +33,7 @@ with st.sidebar:
     st.header("📝 Nuevo Pedido")
     with st.form("formulario_envio", clear_on_submit=True):
         cliente = st.text_input("Nombre del Cliente")
+        servicio = st.selectbox("Tipo de Servicio", SERVICIOS)
         direccion = st.text_input("Dirección de Entrega")
         submitted = st.form_submit_button("Guardar Pedido")
 
@@ -38,6 +48,7 @@ with st.sidebar:
                 nueva_fila = pd.DataFrame({
                     "ID": [nuevo_id],
                     "Cliente": [cliente.strip()],
+                    "Servicio": [servicio],
                     "Dirección": [direccion.strip()],
                     "Estado": ["Pendiente"]
                 })
@@ -62,7 +73,7 @@ with st.sidebar:
         try:
             df_nuevo = pd.read_csv(archivo)
             if {"ID", "Cliente", "Dirección", "Estado"}.issubset(df_nuevo.columns):
-                st.session_state.df = df_nuevo[["ID", "Cliente", "Dirección", "Estado"]]
+                st.session_state.df = normalizar(df_nuevo)
                 st.session_state.df.to_csv(DATA_FILE, index=False)
                 st.success("Respaldo restaurado")
                 st.rerun()
@@ -76,11 +87,15 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.header("📦 Lista de Entregas")
-    estado_filtro = st.selectbox("Filtrar por:", ["Todos", "Pendiente", "Entregado"])
+    f1, f2 = st.columns(2)
+    estado_filtro = f1.selectbox("Filtrar por estado:", ["Todos", "Pendiente", "Entregado"])
+    servicio_filtro = f2.selectbox("Filtrar por servicio:", ["Todos"] + SERVICIOS)
 
     df_f = st.session_state.df.copy()
     if estado_filtro != "Todos":
         df_f = df_f[df_f["Estado"] == estado_filtro]
+    if servicio_filtro != "Todos":
+        df_f = df_f[df_f["Servicio"] == servicio_filtro]
 
     if df_f.empty:
         st.info("No hay pedidos para mostrar")
@@ -98,7 +113,8 @@ with col2:
             "ID del Pedido a actualizar",
             options=df_act["ID"].tolist(),
             format_func=lambda i: (
-                f"#{i} · {df_act.loc[df_act['ID'] == i, 'Cliente'].iloc[0]} "
+                f"#{i} · {df_act.loc[df_act['ID'] == i, 'Cliente'].iloc[0]} · "
+                f"{df_act.loc[df_act['ID'] == i, 'Servicio'].iloc[0]} "
                 f"({df_act.loc[df_act['ID'] == i, 'Estado'].iloc[0]})"
             ),
         )
