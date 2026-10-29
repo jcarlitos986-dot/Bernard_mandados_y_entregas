@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import pydeck as pdk
 import os
 
 st.set_page_config(page_title="Bernard Mandados y Entregas", layout="wide")
@@ -115,14 +116,68 @@ with tab2:
     else:
         st.dataframe(df_f[["ID", "Cliente", "Servicio", "Origen", "Destino", "Forma de cobro", "Forma de pago", "Estado"]], use_container_width=True, hide_index=True)
         
-        st.subheader("Mapa de Ubicaciones")
-        mapa_puntos = []
-        for idx, row in df_f.iterrows():
-            mapa_puntos.append({"lat": row["Origen_Lat"], "lon": row["Origen_Lon"], "Ubicación": f"#{row['ID']} Origen ({row['Cliente']})"})
-            mapa_puntos.append({"lat": row["Destino_Lat"], "lon": row["Destino_Lon"], "Ubicación": f"#{row['ID']} Destino ({row['Cliente']})"})
+        st.subheader("Mapa de Rutas y Ubicaciones")
         
-        df_mapa = pd.DataFrame(mapa_puntos)
-        st.map(df_mapa)
+        puntos = []
+        rutas = []
+        for idx, row in df_f.iterrows():
+            puntos.append({
+                "lat": row["Origen_Lat"],
+                "lon": row["Origen_Lon"],
+                "info": f"#{row['ID']} Origen: {row['Cliente']}",
+                "color": [0, 200, 0, 200]
+            })
+            puntos.append({
+                "lat": row["Destino_Lat"],
+                "lon": row["Destino_Lon"],
+                "info": f"#{row['ID']} Destino: {row['Cliente']}",
+                "color": [200, 0, 0, 200]
+            })
+            rutas.append({
+                "from_lat": row["Origen_Lat"],
+                "from_lon": row["Origen_Lon"],
+                "to_lat": row["Destino_Lat"],
+                "to_lon": row["Destino_Lon"],
+                "info": f"Ruta #{row['ID']} ({row['Cliente']})"
+            })
+            
+        df_puntos = pd.DataFrame(puntos)
+        df_rutas = pd.DataFrame(rutas)
+        
+        mean_lat = df_f["Origen_Lat"].mean() if not df_f.empty else LAT_DEFAULT
+        mean_lon = df_f["Origen_Lon"].mean() if not df_f.empty else LON_DEFAULT
+        
+        view_state = pdk.ViewState(
+            latitude=mean_lat,
+            longitude=mean_lon,
+            zoom=13,
+            pitch=30
+        )
+        
+        line_layer = pdk.Layer(
+            "LineLayer",
+            df_rutas,
+            get_source_position=["from_lon", "from_lat"],
+            get_target_position=["to_lon", "to_lat"],
+            get_color=[255, 140, 0, 255],
+            get_width=5,
+            pickable=True
+        )
+        
+        scatter_layer = pdk.Layer(
+            "ScatterplotLayer",
+            df_puntos,
+            get_position=["lon", "lat"],
+            get_color="color",
+            get_radius=80,
+            pickable=True
+        )
+        
+        st.pydeck_chart(pdk.Deck(
+            layers=[line_layer, scatter_layer],
+            initial_view_state=view_state,
+            tooltip={"text": "{info}"}
+        ))
 
 with tab3:
     st.header("Actualizar Estado de Pedido")
