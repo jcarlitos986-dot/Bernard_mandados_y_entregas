@@ -26,7 +26,7 @@ def cargar_datos():
 if "df" not in st.session_state:
     st.session_state.df = cargar_datos()
 
-st.title("Bernard")
+st.title("Bernard Mandados y Entregas")
 
 # --- REGISTRO ---
 with st.sidebar:
