@@ -5,13 +5,17 @@ import os
 st.set_page_config(page_title="Bernard Mandados y Entregas", layout="wide")
 
 DATA_FILE = "pedidos_reparto.csv"
-COLUMNAS = ["ID", "Cliente", "Servicio", "Dirección", "Estado"]
+COLUMNAS = ["ID", "Cliente", "Servicio", "Origen", "Destino", "Forma de cobro", "Forma de pago", "Estado"]
 SERVICIOS = ["Moto taxi", "Servicio de paquetería", "Mandados"]
+OPCIONES_COBRO = ["Efectivo", "Transferencia", "Terminal"]
+OPCIONES_PAGO = ["Al recoger", "Al entregar"]
 
 def normalizar(df):
-    if "Servicio" not in df.columns:
-        df["Servicio"] = "Sin especificar"
-    df["Servicio"] = df["Servicio"].fillna("Sin especificar")
+    for col in ["Servicio", "Origen", "Destino", "Forma de cobro", "Forma de pago"]:
+        if col not in df.columns:
+            df[col] = "Sin especificar"
+        else:
+            df[col] = df[col].fillna("Sin especificar")
     return df[COLUMNAS]
 
 def cargar_datos():
@@ -34,11 +38,14 @@ with tab1:
     with st.form("formulario_envio", clear_on_submit=True):
         cliente = st.text_input("Nombre del Cliente")
         servicio = st.selectbox("Tipo de Servicio", SERVICIOS)
-        direccion = st.text_input("Dirección de Entrega")
+        origen = st.text_input("Punto de Recogida")
+        destino = st.text_input("Punto de Destino")
+        cobro = st.selectbox("Forma de Cobro", OPCIONES_COBRO)
+        pago = st.selectbox("Forma de Pago", OPCIONES_PAGO)
         submitted = st.form_submit_button("Guardar Pedido")
         
         if submitted:
-            if cliente.strip() and direccion.strip():
+            if cliente.strip() and origen.strip() and destino.strip():
                 if st.session_state.df.empty:
                     nuevo_id = 1
                 else:
@@ -48,7 +55,10 @@ with tab1:
                     "ID": [nuevo_id],
                     "Cliente": [cliente.strip()],
                     "Servicio": [servicio],
-                    "Dirección": [direccion.strip()],
+                    "Origen": [origen.strip()],
+                    "Destino": [destino.strip()],
+                    "Forma de cobro": [cobro],
+                    "Forma de pago": [pago],
                     "Estado": ["Pendiente"]
                 })
                 st.session_state.df = pd.concat([st.session_state.df, nueva_fila], ignore_index=True)
@@ -108,7 +118,7 @@ archivo = st.file_uploader("Restaurar desde CSV", type="csv")
 if archivo is not None and st.button("Restaurar respaldo", use_container_width=True):
     try:
         df_nuevo = pd.read_csv(archivo)
-        if set(["ID", "Cliente", "Dirección", "Estado"]).issubset(df_nuevo.columns):
+        if set(["ID", "Cliente", "Origen", "Destino", "Forma de cobro", "Forma de pago", "Estado"]).issubset(df_nuevo.columns):
             st.session_state.df = normalizar(df_nuevo)
             st.session_state.df.to_csv(DATA_FILE, index=False)
             st.success("Respaldo restaurado")
